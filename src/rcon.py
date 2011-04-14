@@ -29,16 +29,16 @@ class rconConnection(object):
     def rawsend(self,string1,string2='',command=EXECCOMMAND):
 
         self.packet = string1+"\x00"+string2+"\x00"
-        self.packet = pack('L',command)+self.packet
-        self.packet = pack('L',self.requestId)+self.packet
+        self.packet = pack('LL',self.requestId,command)+self.packet
         self.packet = pack('L',len(self.packet))+self.packet
         self.s.send(self.packet)
 
         ## Debug code (remove later)
-
         print "Length :",len(self.packet)
         print "Content:",self.packet
+        print "Raw    :",repr(self.packet)
         print "Req. ID:",self.requestId
+        ##
 
         self.requestId += 1
 
@@ -52,18 +52,19 @@ class rconConnection(object):
             length = unpack('L',chunk)[0]
 
             ## Debug code (remove later)
-
             print "Length :",length
+            ##
 
         while (len(self.buffer)<(length-4)):
             chunk = self.s.recv(4096)
             self.buffer += chunk
+            print "Reply  :",repr(chunk)
 
-        ## Unpacking starts here
-  
         content = unpack('LLss',self.buffer)
 
-        print content
+        ## Debug code (remove later)
+        print "Content:",repr(content)
+        ##
 
         return content
 
