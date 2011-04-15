@@ -1,9 +1,8 @@
 #!/usr/bin/env python
 
-from xdrlib import *
 from struct import *
 from socket import *
-import socket
+import socket,xdrlib
 
 EXECCOMMAND = 2
 AUTH = 3
@@ -51,20 +50,23 @@ class rconConnection(object):
             if chunk == "":
                 break
 
-            responseId = unpack('L',chunk[1:5][::-1])
-            commandResponse = unpack('L',chunk[5:9][::-1])
+            data = chunk[1:]
+            print repr(data)
+            responseId = unpack('L',data[0:4][::-1])[0]
+            commandResponse = unpack('I',data[4:8][::-1])[0]
+            string1 = self.unpackhelper('ss',data[8:])[0]
+            print "responseId:",str(responseId),"commandResponse:",str(commandResponse),"string1:",str(string1)
+            self.packets.append([responseId,commandResponse,string1])
 
-            self.buffer = [ responseId,commandResponse ]
-
-        return self.buffer
+        print self.packets
+        return self.packets
 
     def connect(self):
         self.s = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
         self.s.connect((self.host,self.port))
         self.rawsend(self.rcon,'',AUTH)
         response = self.rawread()
-        print response
-        if response[1][0] != 2:
+        if response[1][1] != 2:
             self.s.close()
             self.connectstate = False
             return False
@@ -77,5 +79,6 @@ if __name__ == "__main__":
     if x.connect():
         print "Yay!"
         x.command('status')
-    else:
-        print "Nay!"
+    if x.connect():
+        print "Yay!"
+        x.command('status')
