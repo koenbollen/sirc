@@ -46,20 +46,16 @@ class rconConnection(object):
                 chunk = self.s.recv(4096)
             except socket.timeout:
                 break
-
             if chunk == "":
                 break
-
-            data = chunk[1:]
-            print repr(data)
-            responseId = unpack('L',data[0:4][::-1])[0]
-            commandResponse = unpack('I',data[4:8][::-1])[0]
-            string1 = self.unpackhelper('ss',data[8:])[0]
-            print "responseId:",str(responseId),"commandResponse:",str(commandResponse),"string1:",str(string1)
+            responseId = unpack('L',chunk[1:5][::-1])[0]
+            commandResponse = unpack('I',chunk[5:9][::-1])[0]
+            string1 = chunk[12:-2]
             self.packets.append([responseId,commandResponse,string1])
-
-        print self.packets
         return self.packets
+
+    def parsepayload(self,packets):
+        return packets[0][2].split('\n')
 
     def connect(self):
         self.s = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
@@ -77,8 +73,5 @@ class rconConnection(object):
 if __name__ == "__main__":
     x = rconConnection('145.92.203.100',27115,'byt3m3')
     if x.connect():
-        print "Yay!"
-        x.command('status')
-    if x.connect():
-        print "Yay!"
-        x.command('status')
+        print x.parsepayload(x.command('status'))
+        print x.parsepayload(x.command('sv_password'))
