@@ -1,77 +1,126 @@
 #!/usr/bin/env python
 
-from struct import *
+import struct
 from socket import *
-import socket,xdrlib
+from Queue import Queue
+import socket
+import logging
+import threading
 
 EXECCOMMAND = 2
 AUTH = 3
 RESPONSE = 0
 AUTH_RESPONSE = 2
 
-class rconConnection(object):
+def nomnom( fmt, raw ):
+    size = struct.calcsize( fmt )
+    res = struct.unpack( fmt, raw[:size] )
+    if len(res) == 1:
+        res = res[0]
+    return res, raw[size:]
+
+def nomstr( raw ):
+    size = raw.index('\0')
+    return raw[:size], raw[size+1:]
+
+class RconConnection(threading.Thread):
 
     def __init__(self,host,port,rcon):
+        threading.Thread.__init__(self, name="rcon-{0}:{1}".format(host,port))
+        self.daemon = True
         self.host = host
         self.port = port
         self.rcon = rcon
-        self.requestId = 1
+        self.packets = {}
+        self.cond = threading.Condition()
+        self.rid = 0
         self.connectstate = False
-
-    def unpackhelper(self,fmt,data):
-        size = calcsize(fmt)
-        return unpack(fmt, data[:size]), data[size:]
+        self.sock = None
 
     def command(self,command):
         if self.connectstate:
-            self.rawsend(command)
-            return self.rawread()
+            return self.send(command)
         else:
             return False
 
-    def rawsend(self,string1,string2='',command=EXECCOMMAND):
+    def send(self,string1,string2='',command=EXECCOMMAND):
+        self.rid += 1
+        packet = string1+"\x00"+string2+"\x00"
+        packet = struct.pack('<II',self.rid,command)+packet
+        packet = struct.pack('<I',len(packet))+packet
+        self.sock.send(packet)
+        return self.rid
 
-        self.packet = string1+"\x00"+string2+"\x00"
-        self.packet = pack('LL',self.requestId,command)+self.packet
-        self.packet = pack('L',len(self.packet))+self.packet
-        self.s.send(self.packet)
-        self.requestId += 1
+
+    def run(self ):
+        while True:
+            self.rawread()
 
     def rawread(self):
-        self.packets = []
-        self.buffer = ''
-        self.s.settimeout(1)
-        while True:
-            try:
-                chunk = self.s.recv(4096)
-            except socket.timeout:
-                break
-            if chunk == "":
-                break
-            responseId = unpack('L',chunk[1:5][::-1])[0]
-            commandResponse = unpack('I',chunk[5:9][::-1])[0]
-            string1 = chunk[12:-2]
-            self.packets.append([responseId,commandResponse,string1])
-        return self.packets
+        raw = self.sock.recv(4)
+        size, raw = nomnom("<L", raw)
+        raw = self.sock.recv(size)
+        rid, raw = nomnom( "<L", raw )
+        ret, raw = nomnom( "<L", raw )
+        str1, raw = nomstr(raw)
+        self.cond.acquire()
+        if rid not in self.packets:
+            self.packets[rid] = Queue()
+        self.packets[rid].put( (ret, str1) )
+        self.cond.notifyAll()
+        self.cond.release()
+
+
+    def getresponse(self, rid, timeout=None ):
+        self.cond.acquire()
+        while rid not in self.packets:
+            self.cond.wait(timeout)
+        packet = self.packets[rid].get()
+        del self.packets[rid]
+        self.cond.release()
+        return packet
 
     def parsepayload(self,packets):
         return packets[0][2].split('\n')
 
     def connect(self):
-        self.s = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
-        self.s.connect((self.host,self.port))
-        self.rawsend(self.rcon,'',AUTH)
-        response = self.rawread()
-        if response[1][1] != 2:
-            self.s.close()
+        self.sock = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
+        self.sock.connect((self.host,self.port))
+        self.start()
+        auth_rid = self.send(self.rcon,'',AUTH)
+        ret,s = self.getresponse( auth_rid )
+        ret,s = self.getresponse( auth_rid )
+        if ret != 2:
+            self.sock.close()
             self.connectstate = False
             return False
         else:
             self.connectstate = True
             return True
 
+    @property
+    def status(self ):
+        rid = self.command( "status" )
+        _, str1 = self.getresponse( rid )
+        info = {}
+        for line in str1.splitlines():
+            if ":" in line:
+                key,value = line.split(":", 1)
+                info[key.strip().lower()] = value.strip()
+        return info
+
+
+
 if __name__ == "__main__":
-    x = rconConnection('145.92.203.100',27115,'byt3m3')
-    if x.connect():
-        print x.parsepayload(x.command('status'))
-        print x.parsepayload(x.command('sv_password'))
+    logging.basicConfig(level=logging.DEBUG)
+    myserver = RconConnection('145.92.203.100',27115,'...snip.snip...')
+    myserver.connect()
+
+    l = []
+    for i in xrange(100):
+        l.append( myserver.command("status") )
+
+    for rid in l:
+        print myserver.getresponse( rid )
+
+# vim: expandtab tabstop=4 softtabstop=4 shiftwidth=4 textwidth=79:
