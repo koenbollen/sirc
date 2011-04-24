@@ -19,10 +19,11 @@ ServerInfo = namedtuple("ServerInfo","host port nickname username password ssl")
 
 class SIrc(object):
 
-    regex = re.compile( r"^(?:@(P<server>[\.\w]+))?!(?P<command>\w+)" )
+    regex = re.compile( r"^(?:@(?P<server>[\.\w]+))?!(?P<command>\w+)" )
 
     def __init__(self, serverinfo ):
         self.info = serverinfo
+        self.running = False
         self.irc = IRC()
         self.connection = self.irc.server()
         self.irc.add_global_handler("all_events", self.dispatcher, -10)
@@ -42,17 +43,24 @@ class SIrc(object):
             )
 
     def on_endofmotd(self, c, e ):
-        logging.debug( "endofmotd received, joining.." +
+        logging.debug( "endofmotd received, joining.. " +
                 str(len(model.Channel.query.all())) )
         for ch in model.Channel.query.all():
             logging.info( "joining {0}".format(ch.name) )
             c.join( ch.name )
 
     def start(self ):
+        self.running = True
         self.connect()
         self.irc.process_forever()
 
+    def stop(self ):
+        self.running = False
+        self.connection.disconnect()
+
     def on_disconnect(self, c, e ):
+        if not self.running:
+            return
         sleep(1)
         self.connect()
 
@@ -83,16 +91,32 @@ class SIrc(object):
             server = match.group("server")
         except IndexError:
             server = None
+        if server:
+            server = model.Server.search(server, ch).first()
+        else:
+            server = model.Server.select( ch ).first()
         command = match.group("command")
         if hasattr(commands, command):
             funk = getattr(commands, command)
             result = None
-            result = funk(c, e, ch, None, command, argv)
+            result = funk(c, e, ch, server, command, argv)
+            logging.debug( "command '{0}' executed, by {1} on {2}"
+                    .format(command, e.source(),repr(server)) )
             if result and isinstance(result, basestring):
-                c.privmsg(e.target(), result)
+                for line in result.strip().splitlines():
+                    c.privmsg(e.target(), line)
 
 
+# command decorators:
 
+def server_required(func):
+    @wraps(func)
+    def _server( c, e, channel, server, command, argv ):
+        if not server:
+            c.privmsg(e.target(), "server required, please @specify of !select")
+            return
+        return func( c, e, channel, server, command, argv )
+    return _server
 
 def private(func):
     @wraps(func)

@@ -1,7 +1,8 @@
 # [si]rc
 
 from elixir import *
-from sqlalchemy import UniqueConstraint
+#from sqlalchemy import UniqueConstraint
+from sqlalchemy import or_
 
 metadata.bind = "sqlite:///sirc.db"
 metadata.bind.echo = True
@@ -47,14 +48,33 @@ class Server(Entity):
     config = Field(Unicode(64))
     servertype = Field(Enum( u"normal", u"tv" ))
     channel = ManyToOne("Channel")
+    selected = Field(Boolean,default=False)
 
-    using_options(UniqueConstraint('name', 'channel_id'))
+    def __str__(self):
+        is_tv = " (tv)" if self.servertype == "tv" else ""
+        return "{name} {host}:{port}{is_tv}".format(
+                is_tv=is_tv,**self.__dict__
+            )
 
     def __repr__(self):
         r = '<Server "{0}" ({1}:{2})'.format(self.name,self.host,self.port)
         if self.servertype and self.servertype != "normal":
             r += " {0}".format(self.servertype)
         return r+">"
+
+    @classmethod
+    def search(cls, text, ch=None):
+        text = unicode("%{0}%".format(text))
+        query = Server.query.filter(
+                or_(Server.name.like(text),Server.host.like(text))
+            )
+        if ch is not None:
+            query = query.filter(Server.channel==ch)
+        return query
+
+    @classmethod
+    def select(cls, ch ):
+        return Server.query.filter_by(channel=ch).filter(Server.selected==True)
 
 def test():
     create = False
