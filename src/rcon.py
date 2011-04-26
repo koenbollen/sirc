@@ -51,30 +51,34 @@ class RconConnection(threading.Thread):
         self.sock.send(packet)
         return self.rid
 
-
     def run(self ):
         while True:
             self.rawread()
 
     def rawread(self):
-        raw = self.sock.recv(4)
-        size, raw = nomnom("<L", raw)
-        raw = self.sock.recv(size)
-        rid, raw = nomnom( "<L", raw )
-        ret, raw = nomnom( "<L", raw )
-        str1, raw = nomstr(raw)
-        self.cond.acquire()
-        if rid not in self.packets:
-            self.packets[rid] = Queue()
-        self.packets[rid].put( (ret, str1) )
-        self.cond.notifyAll()
-        self.cond.release()
-
+        try:
+            raw = self.sock.recv(4)
+            if len(raw) > 0:
+                size, raw = nomnom("<L", raw)
+                raw = self.sock.recv(size)
+                rid, raw = nomnom( "<L", raw )
+                ret, raw = nomnom( "<L", raw )
+                str1, raw = nomstr(raw)
+                self.cond.acquire()
+                if rid not in self.packets:
+                    self.packets[rid] = Queue()
+                self.packets[rid].put( (ret, str1) )
+                self.cond.notifyAll()
+                self.cond.release()
+        except:
+            pass
 
     def getresponse(self, rid, timeout=None ):
         self.cond.acquire()
-        while rid not in self.packets:
+        if rid not in self.packets:
             self.cond.wait(timeout)
+        if rid not in self.packets:
+            return None, None
         packet = self.packets[rid].get()
         del self.packets[rid]
         self.cond.release()
@@ -88,8 +92,8 @@ class RconConnection(threading.Thread):
         self.sock.connect((self.host,self.port))
         self.start()
         auth_rid = self.send(self.rcon,'',AUTH)
-        ret,s = self.getresponse( auth_rid )
-        ret,s = self.getresponse( auth_rid )
+        ret,s = self.getresponse( auth_rid, 1 )
+        ret,s = self.getresponse( auth_rid, 1 )
         if ret != 2:
             self.sock.close()
             self.connectstate = False
@@ -109,18 +113,11 @@ class RconConnection(threading.Thread):
                 info[key.strip().lower()] = value.strip()
         return info
 
-
-
 if __name__ == "__main__":
     logging.basicConfig(level=logging.DEBUG)
-    myserver = RconConnection('145.92.203.100',27115,'...snip..snip...')
+    myserver = RconConnection('145.92.203.100',27115,'lubm4t3')
     myserver.connect()
 
-    l = []
-    for i in xrange(100):
-        l.append( myserver.command("status") )
-
-    for rid in l:
-        print myserver.getresponse( rid )
+    print myserver.status
 
 # vim: expandtab tabstop=4 softtabstop=4 shiftwidth=4 textwidth=79:
