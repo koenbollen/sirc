@@ -115,7 +115,7 @@ class RconConnection(threading.Thread):
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.DEBUG)
-    myserver = RconConnection('145.92.203.100',27115,'lubm4t3')
+    myserver = RconConnection('145.92.203.100',27115,'clubm4t3')
     myserver.connect()
 
     print myserver.status
