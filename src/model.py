@@ -2,7 +2,8 @@
 
 from elixir import *
 #from sqlalchemy import UniqueConstraint
-from sqlalchemy import or_
+from sqlalchemy import or_, orm
+import rcon
 
 metadata.bind = "sqlite:///sirc.db"
 metadata.bind.echo = True
@@ -50,6 +51,14 @@ class Server(Entity):
     channel = ManyToOne("Channel")
     selected = Field(Boolean,default=False)
 
+    @orm.reconstructor
+    def init(self, *args, **kwargs ):
+        self.__connection = rcon.create(
+                self.host,
+                self.port,
+                self.rcon
+            )
+
     def __str__(self):
         is_tv = " (tv)" if self.servertype == "tv" else ""
         return "{name} {host}:{port}{is_tv}".format(
@@ -61,6 +70,10 @@ class Server(Entity):
         if self.servertype and self.servertype != "normal":
             r += " {0}".format(self.servertype)
         return r+">"
+
+    @property
+    def connection(self ):
+        return self.__connection
 
     @classmethod
     def search(cls, text, ch=None):

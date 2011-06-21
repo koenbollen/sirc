@@ -11,25 +11,10 @@ import select
 import socket
 import struct
 import threading
+from util import *
 
 RESPONSE_PING = 0x6A
 RESPONSE_INFO = 0x49
-
-def unpack( fmt, raw ):
-    size = struct.calcsize( fmt )
-    #if size > len(raw): return None, raw
-    result = struct.unpack( fmt, raw[:size] )
-    if len(result) == 1:
-        result = result[0]
-    return result, raw[size:]
-
-def unstring( raw ):
-    try:
-        size = raw.index('\0')
-    except ValueError:
-        return None, raw
-    return raw[:size], raw[size+1:]
-
 
 class QueryThread(threading.Thread):
     """

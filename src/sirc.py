@@ -83,7 +83,10 @@ class SIrc(object):
                 c.privmsg(e.target(), "channel not registered!")
                 return
         line = e.arguments()[0]
-        argv = shlex.split(line)
+        try:
+            argv = shlex.split(line)
+        except ValueError:
+            argv = line.split()
         match = SIrc.regex.search( argv[0] )
         if not match:
             return
@@ -107,13 +110,20 @@ class SIrc(object):
                     c.privmsg(e.target(), line)
 
 
+# command utils:
+
+def ridretstr1_cb(c, e, rid, ret, str1):
+    if str1 and isinstance(str1, basestring):
+        for line in str1.strip().splitlines():
+            c.privmsg( e.target(), line )
+
 # command decorators:
 
 def server_required(func):
     @wraps(func)
     def _server( c, e, channel, server, command, argv ):
         if not server:
-            c.privmsg(e.target(), "server required, please @specify of !select")
+            c.privmsg(e.target(), "server required, please @specify or !select")
             return
         return func( c, e, channel, server, command, argv )
     return _server
@@ -136,7 +146,7 @@ def admin(func):
                     mask=unicode(e.source())
                 ).one()
         except sqlalchemy.orm.exc.NoResultFound:
-            c.privmsg(e.target(), "access denied for command: " + command )
+            c.privmsg(e.target(), "access deNIED for command: " + command )
             return
         return func( c, e, channel, server, command, argv )
     return _admin

@@ -5,16 +5,15 @@ import logging
 import model
 import sirc
 import sqlalchemy
+import functools
 
 
 def list( c, e, channel, server, command, argv ):
     """List servers in this channel"""
-    logging.debug( "!list " + repr(argv) )
     reply = "Servers:\n"
     for s in channel.servers:
         reply += str(s) + "\n"
     return reply
-
 
 @sirc.admin
 @sirc.private
@@ -56,10 +55,10 @@ def select( c, e, channel, server, command, argv ):
 
 
 @sirc.server_required
-@sirc.admin
-def restart( c, e, channel, server, command, argv ):
-    """Dummy command, doesn't restart yet"""
-    return server.name + " restarted. (not really, this is just a test...)"
+def stats( c, e, channel, server, command, argv ):
+    """Display the command 'stats' on selected server."""
+    r= server.connection.execute( "stats",
+            cb=functools.partial( sirc.ridretstr1_cb, c, e ) )
 
 def help( c, e, channel, server, command, argv ):
     """Show available commands"""
