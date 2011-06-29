@@ -69,6 +69,9 @@ def status( c, e, channel, server, command, argv ):
         return "please wait"
     return "'{name}' playing {mapname} ({players} players)".format(**info)
 
+def error( c, e, channel, server, command, argv ):
+    return "3 / 0 = {0}".format( 3 / 0 )
+
 def help( c, e, channel, server, command, argv ):
     """Show available commands"""
     import commands

@@ -102,7 +102,12 @@ class SIrc(object):
         if hasattr(commands, command):
             funk = getattr(commands, command)
             result = None
-            result = funk(c, e, ch, server, command, argv)
+            try:
+                result = funk(c, e, ch, server, command, argv)
+            except Exception, e:
+                logging.error( "error while executing {0}: {1}"
+                        .format( command, e ) )
+                return
             logging.debug( "command '{0}' executed, by {1} on {2}"
                     .format(command, e.source(),repr(server)) )
             if result and isinstance(result, basestring):
