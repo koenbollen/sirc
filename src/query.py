@@ -118,7 +118,6 @@ class QueryThread(threading.Thread):
         server = self.cache.get(addr,{})
 
         responsetype, raw = unpack( "<B", raw )
-        print responsetype
         if responsetype == RESPONSE_INFO:
             if "_gnip" in server:
                 ping = time()-server['_gnip']
@@ -140,6 +139,10 @@ class QueryThread(threading.Thread):
 
             self.wait.append( (time(), addr) )
 
+
+if __name__ != "__main__":
+    thread = QueryThread()
+    thread.start()
 
 if __name__ == "__main__":
     import sys

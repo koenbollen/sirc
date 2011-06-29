@@ -60,6 +60,15 @@ def stats( c, e, channel, server, command, argv ):
     r= server.connection.execute( "stats",
             cb=functools.partial( sirc.ridretstr1_cb, c, e ) )
 
+@sirc.server_required
+def status( c, e, channel, server, command, argv ):
+    """Display query info about the selected server."""
+    try:
+        info = server.info
+    except KeyError:
+        return "please wait"
+    return "'{name}' playing {mapname} ({players} players)".format(**info)
+
 def help( c, e, channel, server, command, argv ):
     """Show available commands"""
     import commands

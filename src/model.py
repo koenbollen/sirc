@@ -4,6 +4,7 @@ from elixir import *
 #from sqlalchemy import UniqueConstraint
 from sqlalchemy import or_, orm
 import rcon
+import query
 
 metadata.bind = "sqlite:///sirc.db"
 metadata.bind.echo = True
@@ -53,6 +54,7 @@ class Server(Entity):
 
     @orm.reconstructor
     def init(self, *args, **kwargs ):
+        query.thread.enqueue( (self.host, self.port) )
         self.__connection = rcon.create(
                 self.host,
                 self.port,
@@ -74,6 +76,10 @@ class Server(Entity):
     @property
     def connection(self ):
         return self.__connection
+
+    @property
+    def info(self ):
+        return query.thread[self.host, self.port]
 
     @classmethod
     def search(cls, text, ch=None):
