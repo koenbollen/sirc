@@ -17,6 +17,21 @@ def list( c, e, channel, server, command, argv ):
     return reply
 
 @sirc.admin
+def select( c, e, channel, server, command, argv ):
+    """Show or select the active server of this channel"""
+    if len(argv) > 1:
+        new = model.Server.search( argv[1], channel ).first()
+        if not new:
+            return "no such file, directory or server: " + str(argv[1])
+        for s in channel.servers:
+            s.selected = False
+        new.selected = True
+        model.session.commit()
+        return "now selected: " + str(new)
+    current = model.Server.select(channel).first()
+    return "selected: " + str(current)
+
+@sirc.admin
 @sirc.private
 def add( c, e, channel, server, command, argv ):
     """Add a server to this channel"""
@@ -44,7 +59,7 @@ def add( c, e, channel, server, command, argv ):
 @sirc.admin
 @sirc.server_required
 def set( c, e, channel, server, command, argv ):
-    """Set properties of a server."""
+    """Set/change properties of a server."""
     valid = ("name", "host", "port", "rcon", "config", "servertype")
     alias = {"hostname": "host",
             "portnumber": "port",
@@ -114,19 +129,6 @@ def delete( c, e, channel, server, command, argv ):
         return "{0} deleted.".format(name)
 delete.hist={}
 
-@sirc.admin
-def select( c, e, channel, server, command, argv ):
-    """Show or select the active server of this channel"""
-    if len(argv) > 1:
-        new = model.Server.search( argv[1], channel ).first()
-        for s in channel.servers:
-            s.selected = False
-        new.selected = True
-        model.session.commit()
-        return "now selected: " + str(new)
-    current = model.Server.select(channel).first()
-    return "selected: " + str(current)
-
 
 @sirc.server_required
 def stats( c, e, channel, server, command, argv ):
@@ -146,6 +148,13 @@ def status( c, e, channel, server, command, argv ):
     except KeyError:
         return "no status available"
     return "'{name}' playing {mapname} ({players} players)".format(**info)
+
+@sirc.admin
+@sirc.server_required
+def rcon( c, e, channel, server, command, argv ):
+    """Execute a raw rcon command at the selected server."""
+    r= server.connection.execute( " ".join(argv[1:]),
+            cb=functools.partial( sirc.ridretstr1_cb, c, e ) )
 
 def error( c, e, channel, server, command, argv ):
     return "3 / 0 = {0}".format( 3 / 0 )

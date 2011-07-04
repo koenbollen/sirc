@@ -47,7 +47,10 @@ class SIrc(object):
                 str(len(model.Channel.query.all())) )
         for ch in model.Channel.query.all():
             logging.info( "joining {0}".format(ch.name) )
-            c.join( ch.name )
+            if ch.key and len(ch.key)>0:
+                c.join( ch.name, ch.key )
+            else:
+                c.join( ch.name )
 
     def start(self ):
         self.running = True
