@@ -99,7 +99,7 @@ def test():
     create = False
     if len(Admin.query.all()) <= 0:
         create = True
-    c = Channel( name="#sirc_test" )
+    c = Channel( name="#sirc" )
     a = Admin(mask="Kaji!koen@xkcd.nl.smurfnet.ch")
     c.admins.append( a )
     s = Server( name="dummy",

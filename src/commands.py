@@ -41,6 +41,54 @@ def add( c, e, channel, server, command, argv ):
     return "server '{0}' created!".format(s.name)
 
 @sirc.admin
+@sirc.server_required
+def edit( c, e, channel, server, command, argv ):
+    """Edit properties of a server."""
+    valid = ("name", "host", "port", "rcon", "config", "servertype")
+    alias = {"hostname": "host",
+            "portnumber": "port",
+            "password": "rcon",
+            "pass": "rcon",
+            "cfg": "config",
+            "type": "servertype"}
+
+    reply = ""
+    if len(argv) < 2:
+        reply = "usage: [@server]!edit ["
+        reply += "=value] [".join(valid) + "=value]"
+        return reply
+
+    tokens = []
+    compl = []
+    for a in argv[1:]:
+        if len(a) > 1 and "=" in a:
+            tokens.extend( a.split("=", 1) )
+        elif a != "=":
+            tokens.append( a )
+    while tokens:
+        l = tokens.pop(0)
+        r = tokens.pop(0)
+        if l in alias:
+            l = alias[l]
+        ok = True
+        if l not in valid:
+            ok = False
+        elif not hasattr(server,l):
+            ok = False
+        if not ok:
+            reply += "no server property: {0}\n".format(l)
+            continue
+        if l == "rcon" and not e.eventtype().startswith( "priv" ):
+            reply += "not setting rcon password in public channel\n"
+            continue
+        server.__setattr__(l,r)
+        model.session.commit()
+        compl.append(l)
+    if len( compl )>0:
+        reply += "succesfully set for '{0}': ".format(server.name) + ", ".join(compl)
+    return reply.strip()
+
+@sirc.admin
 def select( c, e, channel, server, command, argv ):
     """Show or select the active server of this channel"""
     if len(argv) > 1:

@@ -107,6 +107,11 @@ class SIrc(object):
             except Exception, e:
                 logging.error( "error while executing {0}: {1}"
                         .format( command, e ) )
+                if logging.root.level == logging.DEBUG:
+                    print "-"*40
+                    import traceback
+                    traceback.print_exc()
+                    print "-"*40
                 return
             logging.debug( "command '{0}' executed, by {1} on {2}"
                     .format(command, e.source(),repr(server)) )
