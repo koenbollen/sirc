@@ -43,8 +43,8 @@ def add( c, e, channel, server, command, argv ):
 
 @sirc.admin
 @sirc.server_required
-def edit( c, e, channel, server, command, argv ):
-    """Edit properties of a server."""
+def set( c, e, channel, server, command, argv ):
+    """Set properties of a server."""
     valid = ("name", "host", "port", "rcon", "config", "servertype")
     alias = {"hostname": "host",
             "portnumber": "port",
