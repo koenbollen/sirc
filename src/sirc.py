@@ -57,9 +57,9 @@ class SIrc(object):
         self.connect()
         self.irc.process_forever()
 
-    def stop(self ):
+    def stop(self, reason=None):
         self.running = False
-        self.connection.disconnect()
+        self.connection.disconnect(reason)
 
     def on_disconnect(self, c, e ):
         if not self.running:
@@ -171,6 +171,11 @@ if __name__ == "__main__":
     model.metadata.bind.echo = False
     model.setup_all(True)
     inst = SIrc( ServerInfo("xkcd.nl.smurfnet.ch",6697,"koenbot","koen",None,True) )
-    inst.start()
+    try:
+        inst.start()
+    except KeyboardInterrupt:
+        print "quit"
+        inst.stop("KeyboardInterrupt")
+        sleep(1)
 
 # vim: expandtab tabstop=4 softtabstop=4 shiftwidth=4 textwidth=79:
