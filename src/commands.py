@@ -6,6 +6,7 @@ import model
 import sirc
 import sqlalchemy
 import functools
+import time
 
 
 def list( c, e, channel, server, command, argv ):
@@ -82,11 +83,36 @@ def edit( c, e, channel, server, command, argv ):
             reply += "not setting rcon password in public channel\n"
             continue
         server.__setattr__(l,r)
-        model.session.commit()
         compl.append(l)
+    model.session.commit()
     if len( compl )>0:
         reply += "succesfully set for '{0}': ".format(server.name) + ", ".join(compl)
     return reply.strip()
+
+@sirc.admin
+@sirc.server_required
+def delete( c, e, channel, server, command, argv ):
+    """Delete the selected server.
+
+    For confirmation you are required to execute
+    the command twice.
+    """
+    now = time.time()
+    try:
+        t = delete.hist[channel.id,server.id]
+    except KeyError:
+        t = 0
+    if now-t > 5:
+        delete.hist[channel.id,server.id] = now
+        reply = "Please config deletion of server '{0}'".format(server)
+        reply += " (same command again within 5 seconds)"
+        return reply
+    else:
+        name = str(server)
+        server.delete()
+        model.session.commit()
+        return "{0} deleted.".format(name)
+delete.hist={}
 
 @sirc.admin
 def select( c, e, channel, server, command, argv ):
@@ -115,6 +141,10 @@ def status( c, e, channel, server, command, argv ):
         info = server.info
     except KeyError:
         return "please wait"
+    try:
+        n = info['name']
+    except KeyError:
+        return "no status available"
     return "'{name}' playing {mapname} ({players} players)".format(**info)
 
 def error( c, e, channel, server, command, argv ):
@@ -129,7 +159,13 @@ def help( c, e, channel, server, command, argv ):
         func = getattr(commands,c)
         if not hasattr( func, "__call__" ):
             continue
-        result[c] = (func.__doc__, func)
+        if func.__doc__ is None:
+            doc = "n/a"
+        else:
+            doc = func.__doc__.strip()
+        if "\n\n" in doc:
+            doc = doc.split("\n\n",1)[0].strip()
+        result[c] = (doc, func)
         if len(c) > maxlen:
             maxlen = len(c)
     reply = "Available commands:\n"
