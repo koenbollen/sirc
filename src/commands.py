@@ -2,6 +2,7 @@
 
 from decorators import *
 import functools
+from textwrap import dedent
 import logging
 import model
 import sqlalchemy
@@ -41,7 +42,11 @@ def select( c, e, channel, server, command, argv ):
 @admin
 @private
 def add( c, e, channel, server, command, argv ):
-    """Add a server to this channel"""
+    """
+    Add a server to this channel
+
+    only available as a private message due to the rcon password.
+    """
     args = ("name", "host", "port", "rcon", "servertype")
     if len(argv) < 5:
         return "usage: !add name host port rcon [normal|tv]"
@@ -115,7 +120,8 @@ def set( c, e, channel, server, command, argv ):
 @admin
 @server_required
 def delete( c, e, channel, server, command, argv ):
-    """Delete the selected server.
+    """
+    Delete the selected server.
 
     For confirmation you are required to execute
     the command twice.
@@ -172,9 +178,17 @@ def error( c, e, channel, server, command, argv ):
 def help( c, e, channel, server, command, argv ):
     """Show available commands"""
     import commands
+    if len(argv)>1:
+        cmd = argv[1].lstrip("!")
+        if cmd not in __all__:
+            return "no such command or directory: " + cmd
+        func = getattr(commands, cmd)
+        doc = dedent(func.__doc__ or "no help available.. read source")
+        return doc.strip()
+
     result = {}
     maxlen = 0
-    for c in sorted(filter(lambda x: not x.startswith("_"), commands.__all__)):
+    for c in sorted(__all__):
         func = getattr(commands,c)
         if not hasattr( func, "__call__" ):
             continue
@@ -190,6 +204,7 @@ def help( c, e, channel, server, command, argv ):
     reply = "Available commands:\n"
     for c in sorted(result.keys()):
         reply += " !{0:<{1}} : {2}\n".format(c,maxlen,result[c][0])
+    reply += "type !help <command> for more info"
     return reply
 
 

@@ -67,7 +67,7 @@ class SIrc(object):
         self.connect()
         self.irc.process_forever()
 
-    def stop(self, reason=None):
+    def stop(self, reason=""):
         self.running = False
         self.connection.disconnect(reason)
 
@@ -121,7 +121,7 @@ class SIrc(object):
         import commands
         if logging.root.level >= logging.DEBUG:
             reload(commands)
-        if not command.startswith( "_" ) and command in commands.__all__:
+        if command in commands.__all__:
             funk = getattr(commands, command)
             result = None
             try:
