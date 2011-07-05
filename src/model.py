@@ -4,7 +4,10 @@ from elixir import *
 #from sqlalchemy import UniqueConstraint
 from sqlalchemy import or_, orm
 import rcon
+import re
 import query
+import shlex
+import sirc
 
 metadata.bind = "sqlite:///sirc.db"
 metadata.bind.echo = True
@@ -24,7 +27,32 @@ class Owner(User):
 
 class Admin(User):
     using_options(tablename='admin',inheritance='multi')
-    channel = ManyToOne("Channel")
+    channels = ManyToMany("Channel")
+
+    def selectchannel(self, irc_event ):
+        if len(self.channels) < 1:
+            raise ValueError( "no channel available" )
+        elif len(self.channels) < 1:
+            return self.channels[0]
+        line = irc_event.arguments()[0]
+        try:
+            argv = shlex.split(line)
+        except ValueError:
+            argv = line.split()
+        match = sirc.SIrc.regex.search( argv[0] )
+        if match is None:
+            raise ValueError( "multiple channels, please select" )
+        try:
+            chname = match.group("channel")
+        except IndexError:
+            raise ValueError(
+                "multiple channels, please select (#<channel>"+argv[0]+"...)" )
+
+        for ch in self.channels:
+            if ch.name == chname:
+                return ch
+        raise ValueError(
+            "channel not found, please select (#<channel>"+argv[0]+"...)" )
 
     def __repr__(self):
         return '<Admin "{0}">'.format(self.mask)
@@ -34,7 +62,7 @@ class Channel(Entity):
 
     name = Field(Unicode(32))
     key = Field(Unicode(32))
-    admins = OneToMany("Admin")
+    admins = ManyToMany("Admin")
     servers = OneToMany("Server")
 
     def __repr__(self):
@@ -100,8 +128,10 @@ def test():
     if len(Admin.query.all()) <= 0:
         create = True
     c = Channel( name="#sirc" )
+    c2 = Channel( name="#sirc2" )
     a = Admin(mask="Kaji!koen@xkcd.nl.smurfnet.ch")
     c.admins.append( a )
+    c2.admins.append( a )
     s = Server( name="dummy",
             host="localhost", port=27015,
             rcon="not so secret", config="file://default.cfg"

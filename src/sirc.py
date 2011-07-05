@@ -11,7 +11,6 @@ import re
 import shlex
 import sqlalchemy
 
-import commands
 
 logging.basicConfig(level=logging.DEBUG,format="%(levelname)s: %(message)s")
 
@@ -19,7 +18,9 @@ ServerInfo = namedtuple("ServerInfo","host port nickname username password ssl")
 
 class SIrc(object):
 
-    regex = re.compile( r"^(?:@(?P<server>[\.\w]+))?!(?P<command>\w+)" )
+    regex = re.compile(
+            r"^(?P<channel>#[\w_-]+)?(?:@(?P<server>[\.\w]+))?!(?P<command>\w+)"
+        )
 
     def __init__(self, serverinfo ):
         self.info = serverinfo
@@ -38,8 +39,9 @@ class SIrc(object):
         logging.info( "Connecting to {0}".format(self.info.host) )
         self.connection.connect(
                 self.info.host, self.info.port, self.info.nickname,
-                self.info.password, self.info.username, "[si]rc bot",
-                None,None,self.info.ssl
+                self.info.password, self.info.username,
+                "[si]rc bot, (by Koen Bollen)",
+                None, None, self.info.ssl
             )
 
     def on_endofmotd(self, c, e ):
@@ -51,6 +53,9 @@ class SIrc(object):
                 c.join( ch.name, ch.key )
             else:
                 c.join( ch.name )
+
+    def on_join(self, c, e ):
+        c.privmsg( e.target(), "[si]rc bot, reporting for duty!" )
 
     def start(self ):
         self.running = True
@@ -75,7 +80,12 @@ class SIrc(object):
             c.privmsg(nm_to_n(e.source()), "user not registered." )
             return
         e._target = nm_to_n( e.source() )
-        return self.on_pubmsg(c, e, admin.channel )
+        try:
+            ch = admin.selectchannel(e)
+        except ValueError, ee:
+            c.privmsg(nm_to_n(e.source()), ee.args[0] )
+            return
+        return self.on_pubmsg(c, e, ch )
 
 
     def on_pubmsg(self, c, e, ch=None ):
@@ -102,6 +112,7 @@ class SIrc(object):
         else:
             server = model.Server.select( ch ).first()
         command = match.group("command")
+        import commands
         if hasattr(commands, command):
             funk = getattr(commands, command)
             result = None
@@ -155,9 +166,10 @@ def admin(func):
     def _admin( c, e, channel, server, command, argv ):
         try:
             a = model.Admin.query.filter_by(
-                    channel=channel,
                     mask=unicode(e.source())
                 ).one()
+            if channel not in a.channels:
+                raise sqlalchemy.orm.exc.NoResultFound
         except sqlalchemy.orm.exc.NoResultFound:
             c.privmsg(e.target(), "access deNIED for command: " + command )
             return

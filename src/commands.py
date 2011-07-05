@@ -1,9 +1,9 @@
 #!/usr/bin/env python
 #
 
+import sirc
 import logging
 import model
-import sirc
 import sqlalchemy
 import functools
 import time
@@ -81,6 +81,7 @@ def set( c, e, channel, server, command, argv ):
             tokens.extend( a.split("=", 1) )
         elif a != "=":
             tokens.append( a )
+    tokens = filter( lambda x: len(x)>0, tokens)
     while tokens:
         l = tokens.pop(0)
         r = tokens.pop(0)
