@@ -148,7 +148,10 @@ def status( c, e, channel, server, command, argv ):
         n = info['name']
     except KeyError:
         return "no status available"
-    return "'{name}' playing {mapname} ({players} players)".format(**info)
+    reply = "'{name}' playing {mapname} ({players} players)".format(**info)
+    if info['password'] == 0x01:
+        reply += " password protected"
+    return reply
 
 @sirc.admin
 @sirc.server_required

@@ -133,9 +133,12 @@ class QueryThread(threading.Thread):
             game, raw = unstring( raw )
             appid, raw = unpack( "<h", raw )
             (players, maxplayers, numbots), raw = unpack( "<BBB", raw )
+            (dedicated, os, passwd, vac), raw = unpack( "<BBBB", raw )
             self.cache[addr] = {'name': name, 'mapname': mapname, 'gamedir':
                     gamedir, 'game': game, 'players': players, 'ping': ping,
-                    'maxplayers': maxplayers, 'numbots': numbots}
+                    'maxplayers': maxplayers, 'numbots': numbots,
+                    'dedicated': dedicated, 'os': os, 'password': passwd,
+                    'vac': vac }
 
             self.wait.append( (time(), addr) )
 
