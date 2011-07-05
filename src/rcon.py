@@ -1,7 +1,7 @@
 # [si]rc - Asynchronous source RCON tool.
 
-import Queue as queue
 from util import *
+import Queue as queue
 import logging
 import select
 import socket

@@ -1,13 +1,12 @@
 # [si]rc
 
 from elixir import *
-#from sqlalchemy import UniqueConstraint
 from sqlalchemy import or_, orm
+import query
 import rcon
 import re
-import query
 import shlex
-import sirc
+import util
 
 metadata.bind = "sqlite:///sirc.db"
 metadata.bind.echo = True
@@ -39,9 +38,9 @@ class Admin(User):
             argv = shlex.split(line)
         except ValueError:
             argv = line.split()
-        match = sirc.SIrc.regex.search( argv[0] )
+        match = util.regex.search( argv[0] )
         if match is None:
-            raise ValueError( "multiple channels, please select" )
+            raise TypeError( "not a command" )
         try:
             chname = match.group("channel")
         except IndexError:
@@ -79,6 +78,8 @@ class Server(Entity):
     servertype = Field(Enum( u"normal", u"tv" ))
     channel = ManyToOne("Channel")
     selected = Field(Boolean,default=False)
+
+    delete_cache = {} # for !delete command
 
     @orm.reconstructor
     def init(self, *args, **kwargs ):

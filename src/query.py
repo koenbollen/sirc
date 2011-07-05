@@ -1,17 +1,16 @@
-#!/usr/bin/env python
-#
+# [si]rc - Asynchronous source RCON tool.
 
 """A single thread that queries and maintains information on source servers.
 """
 
 from Queue import Queue
 from time import time
+from util import *
 import logging
 import select
 import socket
 import struct
 import threading
-from util import *
 
 RESPONSE_PING = 0x6A
 RESPONSE_INFO = 0x49

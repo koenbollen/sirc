@@ -1,8 +1,9 @@
 # [si]rc - utility functions..
 
 import struct
+import re
 
-__all__ = [ "unpack", "unint", "unstring" ]
+__all__ = [ "unpack", "unint", "unstring", "regex" ]
 
 def unpack( fmt, raw ):
     """Unpack fmt from raw and return the result and the rest."""
@@ -24,5 +25,11 @@ def unstring( raw ):
     except ValueError:
         return None, raw
     return raw[:size], raw[size+1:]
+
+regex = re.compile(
+        r"^(?P<channel>#[\w_-]+)?(?:@(?P<server>[\.\w]+))?!(?P<command>\w+)"
+    )
+
+
 
 # vim: expandtab tabstop=4 softtabstop=4 shiftwidth=4 textwidth=79:

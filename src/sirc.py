@@ -10,6 +10,7 @@ import model
 import re
 import shlex
 import sqlalchemy
+import util
 
 
 logging.basicConfig(level=logging.DEBUG,format="%(levelname)s: %(message)s")
@@ -18,22 +19,18 @@ ServerInfo = namedtuple("ServerInfo","host port nickname username password ssl")
 
 class SIrc(object):
 
-    regex = re.compile(
-            r"^(?P<channel>#[\w_-]+)?(?:@(?P<server>[\.\w]+))?!(?P<command>\w+)"
-        )
-
     def __init__(self, serverinfo ):
         self.info = serverinfo
         self.running = False
         self.irc = IRC()
         self.connection = self.irc.server()
         self.irc.add_global_handler("all_events", self.dispatcher, -10)
+        self.known_nick = self.info.nickname
 
     def dispatcher(self, c, e ):
         m = "on_" + e.eventtype()
         if hasattr(self, m):
             getattr(self, m)(c, e)
-
 
     def connect(self ):
         logging.info( "Connecting to {0}".format(self.info.host) )
@@ -45,6 +42,7 @@ class SIrc(object):
             )
 
     def on_endofmotd(self, c, e ):
+        self.known_nick = e.target()
         logging.debug( "endofmotd received, joining.. " +
                 str(len(model.Channel.query.all())) )
         for ch in model.Channel.query.all():
@@ -54,8 +52,15 @@ class SIrc(object):
             else:
                 c.join( ch.name )
 
+    def on_nick(self, c, e ):
+        old = self.known_nick
+        self.known_nick = e.target()
+        logging.info( "nick changed from {0} to {1}".format(old,
+            self.known_nick) )
+
     def on_join(self, c, e ):
-        c.privmsg( e.target(), "[si]rc bot, reporting for duty!" )
+        if nm_to_n( e.source() ) == self.known_nick:
+            c.privmsg( e.target(), "[si]rc bot, reporting for duty!" )
 
     def start(self ):
         self.running = True
@@ -85,8 +90,9 @@ class SIrc(object):
         except ValueError, ee:
             c.privmsg(nm_to_n(e.source()), ee.args[0] )
             return
+        except TypeError:
+            return
         return self.on_pubmsg(c, e, ch )
-
 
     def on_pubmsg(self, c, e, ch=None ):
         if not ch:
@@ -100,7 +106,7 @@ class SIrc(object):
             argv = shlex.split(line)
         except ValueError:
             argv = line.split()
-        match = SIrc.regex.search( argv[0] )
+        match = util.regex.search( argv[0] )
         if not match:
             return
         try:
@@ -113,7 +119,9 @@ class SIrc(object):
             server = model.Server.select( ch ).first()
         command = match.group("command")
         import commands
-        if hasattr(commands, command):
+        if logging.root.level >= logging.DEBUG:
+            reload(commands)
+        if not command.startswith( "_" ) and command in commands.__all__:
             funk = getattr(commands, command)
             result = None
             try:
@@ -132,51 +140,6 @@ class SIrc(object):
             if result and isinstance(result, basestring):
                 for line in result.strip().splitlines():
                     c.privmsg(e.target(), line)
-
-
-# command utils:
-
-def ridretstr1_cb(c, e, rid, ret, str1):
-    if str1 and isinstance(str1, basestring):
-        for line in str1.strip().splitlines():
-            c.privmsg( e.target(), line )
-
-# command decorators:
-
-def server_required(func):
-    @wraps(func)
-    def _server( c, e, channel, server, command, argv ):
-        if not server:
-            c.privmsg(e.target(), "server required, please @specify or !select")
-            return
-        return func( c, e, channel, server, command, argv )
-    return _server
-
-def private(func):
-    @wraps(func)
-    def _private( c, e, channel, server, command, argv ):
-        if not e.eventtype().startswith( "priv" ):
-            c.privmsg(e.target(), "private only command: " + command )
-            return
-        return func( c, e, channel, server, command, argv )
-    return _private
-
-def admin(func):
-    @wraps(func)
-    def _admin( c, e, channel, server, command, argv ):
-        try:
-            a = model.Admin.query.filter_by(
-                    mask=unicode(e.source())
-                ).one()
-            if channel not in a.channels:
-                raise sqlalchemy.orm.exc.NoResultFound
-        except sqlalchemy.orm.exc.NoResultFound:
-            c.privmsg(e.target(), "access deNIED for command: " + command )
-            return
-        return func( c, e, channel, server, command, argv )
-    return _admin
-
-
 
 
 if __name__ == "__main__":

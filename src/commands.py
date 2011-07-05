@@ -1,12 +1,19 @@
-#!/usr/bin/env python
-#
+# [si]rc - Asynchronous source RCON tool.
 
-import sirc
+from decorators import *
+import functools
 import logging
 import model
 import sqlalchemy
-import functools
 import time
+
+__all__ = [
+        "list", "select",
+        "add", "set", "delete",
+        "stats", "status", "rcon",
+        "error", "help"
+    ]
+
 
 
 def list( c, e, channel, server, command, argv ):
@@ -16,7 +23,7 @@ def list( c, e, channel, server, command, argv ):
         reply += str(s) + "\n"
     return reply
 
-@sirc.admin
+@admin
 def select( c, e, channel, server, command, argv ):
     """Show or select the active server of this channel"""
     if len(argv) > 1:
@@ -31,8 +38,8 @@ def select( c, e, channel, server, command, argv ):
     current = model.Server.select(channel).first()
     return "selected: " + str(current)
 
-@sirc.admin
-@sirc.private
+@admin
+@private
 def add( c, e, channel, server, command, argv ):
     """Add a server to this channel"""
     args = ("name", "host", "port", "rcon", "servertype")
@@ -56,8 +63,8 @@ def add( c, e, channel, server, command, argv ):
     model.session.commit()
     return "server '{0}' created!".format(s.name)
 
-@sirc.admin
-@sirc.server_required
+@admin
+@server_required
 def set( c, e, channel, server, command, argv ):
     """Set/change properties of a server."""
     valid = ("name", "host", "port", "rcon", "config", "servertype")
@@ -105,8 +112,8 @@ def set( c, e, channel, server, command, argv ):
         reply += "succesfully set for '{0}': ".format(server.name) + ", ".join(compl)
     return reply.strip()
 
-@sirc.admin
-@sirc.server_required
+@admin
+@server_required
 def delete( c, e, channel, server, command, argv ):
     """Delete the selected server.
 
@@ -115,12 +122,12 @@ def delete( c, e, channel, server, command, argv ):
     """
     now = time.time()
     try:
-        t = delete.hist[channel.id,server.id]
+        t = model.Server.delete_cache[channel.id,server.id]
     except KeyError:
         t = 0
     if now-t > 5:
-        delete.hist[channel.id,server.id] = now
-        reply = "Please config deletion of server '{0}'".format(server)
+        model.Server.delete_cache[channel.id,server.id] = now
+        reply = "Please confirm deletion of server '{0}'".format(server)
         reply += " (same command again within 5 seconds)"
         return reply
     else:
@@ -128,16 +135,15 @@ def delete( c, e, channel, server, command, argv ):
         server.delete()
         model.session.commit()
         return "{0} deleted.".format(name)
-delete.hist={}
 
 
-@sirc.server_required
+@server_required
 def stats( c, e, channel, server, command, argv ):
     """Display the command 'stats' on selected server."""
     r= server.connection.execute( "stats",
-            cb=functools.partial( sirc.ridretstr1_cb, c, e ) )
+            cb=functools.partial( _ridretstr1_cb, c, e ) )
 
-@sirc.server_required
+@server_required
 def status( c, e, channel, server, command, argv ):
     """Display query info about the selected server."""
     try:
@@ -153,12 +159,12 @@ def status( c, e, channel, server, command, argv ):
         reply += " password protected"
     return reply
 
-@sirc.admin
-@sirc.server_required
+@admin
+@server_required
 def rcon( c, e, channel, server, command, argv ):
     """Execute a raw rcon command at the selected server."""
     r= server.connection.execute( " ".join(argv[1:]),
-            cb=functools.partial( sirc.ridretstr1_cb, c, e ) )
+            cb=functools.partial( _ridretstr1_cb, c, e ) )
 
 def error( c, e, channel, server, command, argv ):
     return "3 / 0 = {0}".format( 3 / 0 )
@@ -168,7 +174,7 @@ def help( c, e, channel, server, command, argv ):
     import commands
     result = {}
     maxlen = 0
-    for c in filter(lambda x: not x.startswith("_"), dir(commands)):
+    for c in sorted(filter(lambda x: not x.startswith("_"), commands.__all__)):
         func = getattr(commands,c)
         if not hasattr( func, "__call__" ):
             continue
@@ -185,6 +191,13 @@ def help( c, e, channel, server, command, argv ):
     for c in sorted(result.keys()):
         reply += " !{0:<{1}} : {2}\n".format(c,maxlen,result[c][0])
     return reply
+
+
+def _ridretstr1_cb(c, e, rid, ret, str1):
+    if str1 and isinstance(str1, basestring):
+        for line in str1.strip().splitlines():
+            c.privmsg( e.target(), line )
+
 
 
 # vim: expandtab tabstop=4 softtabstop=4 shiftwidth=4 textwidth=79:
